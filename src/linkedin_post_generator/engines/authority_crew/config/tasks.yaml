@@ -1,0 +1,119 @@
+research_task:
+  description: >
+    Research the following topic thoroughly: "{topic}".
+
+    The author's intended angle is: "{leader_angle}"
+
+    Your job is to gather the raw intelligence that will power a world-class LinkedIn post.
+    Use your search tools (ArXiv, Tavily, Serper) to find:
+    - The latest technical papers or benchmarks (last 90 days preferred)
+    - Real statistics and performance numbers (not vague claims)
+    - Key researchers, companies, or projects involved
+    - Any notable counter-arguments or limitations
+    - 2-3 concrete examples or use cases
+
+    Search ArXiv for technical papers. Use Tavily for general web context.
+    Use Serper to search Google for recent news and to find real LinkedIn posts
+    about this topic for tone reference (query: site:linkedin.com/posts "{topic}").
+  expected_output: >
+    A structured Fact Sheet in markdown with these exact sections:
+
+    ## Key Findings
+    (5-7 bullet points of the most important, citable facts)
+
+    ## Technical Detail
+    (2-3 paragraphs explaining the mechanism, approach, or technology)
+
+    ## Data Points & Quotes
+    (Specific numbers, benchmark results, or notable quotes with attribution)
+
+    ## Counter-Arguments & Limitations
+    (What critics say, what the tech can't do yet, edge cases)
+
+    ## Sources
+    (List of URLs used — at least 3 sources)
+  agent: technical_researcher
+
+writing_task:
+  description: >
+    Using the Fact Sheet from the researcher, write a LinkedIn post about "{topic}".
+
+    Author persona:
+    - Name: {author_name}
+    - Title: {author_title}
+    - Location: {author_location}
+
+    The author's angle / perspective to emphasize: "{leader_angle}"
+
+    STYLE RULES (follow these precisely):
+    1. Opening hook: First 1-2 lines must stop the scroll. No "I'm excited to share",
+       no "Hot take:", no "Thread:". Make it a bold statement, provocative question,
+       or a striking specific fact.
+    2. "Why it matters" paragraph: Explain the real-world implication, not just what happened.
+    3. One contrarian or nuanced take: What is everyone getting wrong about this?
+       What's the uncomfortable truth?
+    4. Technical credibility moment: One specific technical detail that shows depth
+       without being inaccessible to a non-researcher.
+    5. Closing: End with a genuine question or a clear call-to-action that invites
+       thoughtful replies. Not "What do you think?" — make it specific.
+    6. Length: 1200-1800 characters (count carefully).
+    7. Hashtags: Max 5, placed at the very end, only use highly relevant ones.
+    8. NO markdown formatting inside the post (no **, no ##, no bullets with -).
+       Use line breaks and white space for readability instead.
+
+    The voice should be: professional, opinionated, slightly witty, deeply informed.
+    The reader should think "this person really knows their stuff AND has a perspective."
+  expected_output: >
+    The LinkedIn post as plain text, exactly as it would appear when posted.
+    No markdown formatting characters (no **, ##, -, etc.) inside the post body.
+    Hashtags at the end only. Ready to copy-paste directly into LinkedIn.
+  agent: thought_leader
+  context:
+    - research_task
+
+critique_task:
+  description: >
+    You have two jobs in this task.
+
+    JOB 1 — FACT-CHECK AND EDIT THE POST:
+    Review the LinkedIn post draft carefully.
+    Cross-check every factual claim against the Fact Sheet from the researcher.
+    If any claim is unsupported, hyperbolic, or inaccurate — rewrite that section.
+    Also check:
+    - Character count (must be 1200-1800 chars — count precisely)
+    - Hook strength (would YOU stop scrolling for this?)
+    - Hashtag count (max 5, remove any generic/weak ones)
+    - Voice consistency (professional + technical + slightly light)
+    - No forbidden phrases: "I'm excited", "game-changer", "revolutionary",
+      "the future is", "cutting-edge" (unless in a quote)
+
+    JOB 2 — CREATE THE DALL-E IMAGE PROMPT:
+    Analyze the final post and design a DALL-E 3 image that visually represents
+    the theme. Choose ONE of these two visual styles:
+
+    Style A — Minimalist Brutalist: stark architecture, geometric forms, deep
+    contrast, one accent color, cinematic lighting, no text, no people.
+
+    Style B — Technical Diagram: translucent layered data visualization,
+    dark background, nodes/connections in muted amber or cyan, sophisticated
+    UI aesthetic, clean resolution.
+
+    The prompt must be 150-200 words, highly specific, and NOT include:
+    robot hands, lightbulbs, brain graphics, circuit boards overlaid on faces,
+    or any cliché "AI" imagery. Think editorial magazine cover.
+
+    IMPORTANT: After writing the DALL-E prompt, use the dalle_image_generator tool
+    to actually generate and save the image. Pass the prompt you wrote.
+  expected_output: >
+    Your response must have EXACTLY these two sections:
+
+    ## Finalized Post
+    (The corrected, final LinkedIn post — plain text, ready to copy-paste)
+
+    ## DALL-E Prompt
+    (The image generation prompt text only — 150-200 words)
+  agent: critic_visual_director
+  context:
+    - research_task
+    - writing_task
+  output_file: outputs/latest_post.md

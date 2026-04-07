@@ -1,0 +1,13 @@
+.env
+__pycache__/
+.DS_Store
+.venv/
+outputs/
+*.pyc
+*.pyo
+.pytest_cache/
+uv.lock
+run.txt
+settings.json
+settings.local.json
+user_preference.txt
