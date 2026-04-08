@@ -15,7 +15,7 @@ from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 from crewai_tools import TavilySearchTool
 
-from linkedin_post_generator.tools import ArxivSearchTool, DalleImageTool
+from linkedin_post_generator.tools import ArxivSearchTool
 
 
 @CrewBase
@@ -56,7 +56,6 @@ class AuthorityCrew:
             config=self.agents_config["critic_visual_director"],  # type: ignore[index]
             tools=[
                 TavilySearchTool(),
-                DalleImageTool(),
             ],
             verbose=True,
         )

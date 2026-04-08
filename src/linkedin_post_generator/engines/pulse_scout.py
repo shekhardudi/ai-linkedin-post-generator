@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import httpx
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
 
 from .pulse_scout_modules.base import BaseScanner, ScanResult
@@ -31,13 +30,22 @@ from .pulse_scout_modules.tooling_and_tactics import ToolingAndTacticsScanner
 class PulseScout:
     """
     Orchestrates 5 pluggable intelligence modules and synthesises results
-    via a local Ollama LLM into a structured market briefing.
+    via either a local Ollama LLM or OpenAI GPT-4o-mini (configurable).
+
+    Config (environment variables):
+      SCOUT_USE_OPENAI=true    → use GPT-4o-mini for synthesis (no Ollama required)
+      SCOUT_USE_OPENAI=false   → use local Ollama (default)
+      SCOUT_OPENAI_MODEL       → override OpenAI model (default: gpt-4o-mini)
+      OLLAMA_BASE_URL          → Ollama server URL (default: http://localhost:11434)
+      OLLAMA_MODEL             → Ollama model name (default: llama3.1)
     """
 
     def __init__(self):
         self._ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self._ollama_model = os.getenv("OLLAMA_MODEL", "llama3.1")
         self._tavily_key = os.environ.get("TAVILY_API_KEY", "")
+        self._use_openai = os.getenv("SCOUT_USE_OPENAI", "false").lower() == "true"
+        self._openai_model = os.getenv("SCOUT_OPENAI_MODEL", "gpt-4o-mini")
 
         self.MODULE_REGISTRY: dict[str, BaseScanner] = {
             "community_sentiment": CommunitySentimentScanner(self._tavily_key),
@@ -50,6 +58,12 @@ class PulseScout:
     # ------------------------------------------------------------------
     # Health check
     # ------------------------------------------------------------------
+
+    def synthesis_backend_label(self) -> str:
+        """Human-readable label for the active synthesis backend (used in sidebar)."""
+        if self._use_openai:
+            return f"OpenAI ({self._openai_model})"
+        return f"Ollama ({self._ollama_model})"
 
     def check_ollama_health(self) -> bool:
         """Ping Ollama server. Returns True if reachable."""
@@ -113,12 +127,17 @@ RAW DATA:
 
 Write the briefing now. Be sharp, specific, and contrarian where warranted."""
 
-        llm = ChatOllama(
-            model=self._ollama_model,
-            base_url=self._ollama_base_url,
-            temperature=0.7,
-            num_ctx=8192,
-        )
+        if self._use_openai:
+            from langchain_openai import ChatOpenAI
+            llm = ChatOpenAI(model=self._openai_model, temperature=0.7)
+        else:
+            from langchain_ollama import ChatOllama
+            llm = ChatOllama(
+                model=self._ollama_model,
+                base_url=self._ollama_base_url,
+                temperature=0.7,
+                num_ctx=8192,
+            )
         response = llm.invoke([HumanMessage(content=prompt)])
         return response.content
 

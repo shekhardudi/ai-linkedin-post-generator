@@ -3,7 +3,7 @@ import json
 import subprocess
 import sys
 import warnings
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
@@ -13,6 +13,7 @@ from linkedin_post_generator.utils.user_profile import load_user_profile
 
 def _default_inputs() -> dict:
     profile = load_user_profile()
+    today = date.today()
     return {
         "topic": "Agentic AI workflows",
         "leader_angle": "Why most agentic systems are overengineered for the problems they solve",
@@ -20,7 +21,9 @@ def _default_inputs() -> dict:
         "author_title": profile["title"],
         "author_location": profile["location"],
         "author_vibe": "calm, direct, and slightly skeptical",
-        "current_year": str(datetime.now().year),
+        "current_year": str(today.year),
+        "current_date": today.strftime("%B %d, %Y"),
+        "current_date_minus_90": (today - timedelta(days=90)).strftime("%B %d, %Y"),
     }
 
 
