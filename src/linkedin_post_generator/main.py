@@ -19,6 +19,7 @@ def _default_inputs() -> dict:
         "author_name": profile["name"],
         "author_title": profile["title"],
         "author_location": profile["location"],
+        "author_vibe": "calm, direct, and slightly skeptical",
         "current_year": str(datetime.now().year),
     }
 
@@ -32,7 +33,7 @@ def run():
 
 
 def run_scout():
-    """Run Pulse Scout engine (CLI entry point)."""
+    """Run Pulse Scout engine (CLI entry point) — all 5 modules, last 7 days."""
     from linkedin_post_generator.engines.pulse_scout import PulseScout
 
     scout = PulseScout()
@@ -42,13 +43,19 @@ def run_scout():
         print("Start Ollama with: ollama serve")
         sys.exit(1)
 
-    def _progress(step: int, total: int):
-        labels = ["Starting...", "ArXiv scan done", "Tech news scan done", "HN scan done", "Synthesis complete"]
-        label = labels[step] if step < len(labels) else f"Step {step}/{total}"
-        print(f"  [{step}/{total}] {label}")
+    all_modules = list(scout.MODULE_REGISTRY.keys())
 
-    print("Running Pulse Scout...")
-    report = scout.run(progress_callback=_progress)
+    def _progress(step: int, total: int):
+        if step == total:
+            print(f"  [{step}/{total}] Synthesis complete!")
+        elif step == total - 1:
+            print(f"  [{step}/{total}] Synthesising with Ollama...")
+        elif step < len(all_modules):
+            label = scout.MODULE_REGISTRY[all_modules[step]].MODULE_LABEL
+            print(f"  [{step}/{total}] Scanning {label}...")
+
+    print("Running Pulse Scout (all 5 modules, last 7 days)...")
+    report = scout.run(modules=all_modules, days=7, progress_callback=_progress)
     print("\nPulse report written to outputs/pulse_report.md\n")
     print(report[:600] + "..." if len(report) > 600 else report)
 

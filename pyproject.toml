@@ -16,6 +16,7 @@ dependencies = [
     "tiktoken>=0.7.0",
     "Pillow>=10.0.0",
     "python-dotenv>=1.0.0",
+    "crawl4ai>=0.4.0",
 ]
 
 [project.scripts]

@@ -1,7 +1,14 @@
 """
-Engine 1: Pulse Scout — Local Intelligence
-Runs entirely on Ollama (free/local) + Tavily + HN Algolia API.
+Engine 1: Pulse Scout — Modular Local Intelligence
+Runs entirely on Ollama (free/local) + Tavily + crawl4ai + HN Algolia + ArXiv.
 No crewAI overhead — pure Python pipeline for maximum simplicity and speed.
+
+Five configurable modules:
+  community_sentiment  — Reddit, X/Twitter, TLDR AI, Hacker News
+  technical_deep_dive  — ArXiv research papers
+  tooling_and_tactics  — Ben's Bites, The Neuron, The Rundown AI
+  long_form_strategy   — Latent Space, Import AI, MIT Algorithm
+  expert_synthesis     — The Batch (Andrew Ng), HuggingFace weekly
 """
 
 import os
@@ -9,28 +16,36 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
-import arxiv
 import httpx
 from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage
-from tavily import TavilyClient
+
+from .pulse_scout_modules.base import BaseScanner, ScanResult
+from .pulse_scout_modules.community_sentiment import CommunitySentimentScanner
+from .pulse_scout_modules.expert_synthesis import ExpertSynthesisScanner
+from .pulse_scout_modules.long_form_strategy import LongFormStrategyScanner
+from .pulse_scout_modules.technical_deep_dive import TechnicalDeepDiveScanner
+from .pulse_scout_modules.tooling_and_tactics import ToolingAndTacticsScanner
 
 
 class PulseScout:
     """
-    Scans 3 intelligence vectors and synthesizes a market briefing via local Ollama.
-
-    Vector 1 — The Alpha:   ArXiv (technical breakthroughs)
-    Vector 2 — The Hype:    Tech news via Tavily (M&A, products, policy)
-    Vector 3 — The Gap:     Hacker News Algolia (developer sentiment & pain points)
+    Orchestrates 5 pluggable intelligence modules and synthesises results
+    via a local Ollama LLM into a structured market briefing.
     """
-
-    TOTAL_STEPS = 4  # 3 scans + 1 synthesis
 
     def __init__(self):
         self._ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         self._ollama_model = os.getenv("OLLAMA_MODEL", "llama3.1")
         self._tavily_key = os.environ.get("TAVILY_API_KEY", "")
+
+        self.MODULE_REGISTRY: dict[str, BaseScanner] = {
+            "community_sentiment": CommunitySentimentScanner(self._tavily_key),
+            "technical_deep_dive": TechnicalDeepDiveScanner(),
+            "tooling_and_tactics": ToolingAndTacticsScanner(),
+            "long_form_strategy": LongFormStrategyScanner(),
+            "expert_synthesis": ExpertSynthesisScanner(self._tavily_key),
+        }
 
     # ------------------------------------------------------------------
     # Health check
@@ -45,151 +60,64 @@ class PulseScout:
             return False
 
     # ------------------------------------------------------------------
-    # Vector 1 — ArXiv (The Alpha)
-    # ------------------------------------------------------------------
-
-    def scan_vector_1_arxiv(self) -> list[dict]:
-        """Fetch the latest AI/ML papers from ArXiv."""
-        client = arxiv.Client()
-        search = arxiv.Search(
-            query="(artificial intelligence OR large language model OR LLM OR AI agent) AND (2024 OR 2025)",
-            max_results=6,
-            sort_by=arxiv.SortCriterion.SubmittedDate,
-            sort_order=arxiv.SortOrder.Descending,
-        )
-        results = []
-        for paper in client.results(search):
-            results.append({
-                "title": paper.title,
-                "authors": [a.name for a in paper.authors[:3]],
-                "abstract": paper.summary[:400].replace("\n", " "),
-                "published": paper.published.strftime("%Y-%m-%d"),
-                "url": paper.entry_id,
-            })
-        return results
-
-    # ------------------------------------------------------------------
-    # Vector 2 — Tech News (The Hype)
-    # ------------------------------------------------------------------
-
-    def scan_vector_2_tech_news(self) -> list[dict]:
-        """Search for AI business/product/policy news via Tavily."""
-        if not self._tavily_key:
-            return [{"title": "Tavily API key not set", "content": "", "url": ""}]
-
-        client = TavilyClient(api_key=self._tavily_key)
-        response = client.search(
-            query="AI machine learning company acquisitions products policy announcements 2025",
-            search_depth="advanced",
-            topic="news",
-            max_results=6,
-        )
-        results = []
-        for r in response.get("results", []):
-            results.append({
-                "title": r.get("title", ""),
-                "content": r.get("content", "")[:300],
-                "url": r.get("url", ""),
-                "published": r.get("published_date", ""),
-            })
-        return results
-
-    # ------------------------------------------------------------------
-    # Vector 3 — Hacker News (The Gap)
-    # ------------------------------------------------------------------
-
-    def scan_vector_3_dev_community(self) -> list[dict]:
-        """Fetch trending AI/ML stories from Hacker News (free, no key)."""
-        try:
-            response = httpx.get(
-                "https://hn.algolia.com/api/v1/search_by_date",
-                params={
-                    "query": "AI LLM machine learning agent",
-                    "tags": "story",
-                    "hitsPerPage": 15,
-                    "numericFilters": "points>30",
-                },
-                timeout=10.0,
-            )
-            response.raise_for_status()
-            hits = response.json().get("hits", [])[:8]
-            return [
-                {
-                    "title": h.get("title", ""),
-                    "url": h.get("url") or f"https://news.ycombinator.com/item?id={h.get('objectID')}",
-                    "points": h.get("points", 0),
-                    "comments": h.get("num_comments", 0),
-                    "date": (h.get("created_at") or "")[:10],
-                }
-                for h in hits
-            ]
-        except Exception as e:
-            return [{"title": f"HN fetch failed: {e}", "url": "", "points": 0, "comments": 0, "date": ""}]
-
-    # ------------------------------------------------------------------
     # Synthesis via Ollama
     # ------------------------------------------------------------------
 
-    def synthesize(
-        self,
-        v1_arxiv: list[dict],
-        v2_news: list[dict],
-        v3_hn: list[dict],
-    ) -> str:
+    def _format_items(self, result: ScanResult) -> str:
+        """Format a ScanResult's items into a compact string for the synthesis prompt."""
+        if not result.items:
+            return "(no data)"
+
+        lines = []
+        for item in result.items:
+            if result.module_id == "technical_deep_dive":
+                line = f"- [{item.get('published', '')}] {item.get('title', '')} — {item.get('abstract', '')[:150]}..."
+            else:
+                title = item.get("title", "")
+                content = item.get("content", "")[:200]
+                url = item.get("url", "")
+                line = f"- {title}: {content}" if title else f"- [{url}] {content}"
+            lines.append(line)
+        return "\n".join(lines)
+
+    def synthesize(self, results: list[ScanResult], days: int) -> str:
         """Call local Ollama to synthesize a structured intelligence briefing."""
+        active = [r for r in results if r.items]
+        if not active:
+            return "_No data collected from the selected modules._"
 
-        def fmt_arxiv(items):
-            return "\n".join(
-                f"- [{p['published']}] {p['title']} — {p['abstract'][:150]}..."
-                for p in items
-            )
+        # Build the raw data block — one section per active module
+        data_sections = []
+        for r in active:
+            data_sections.append(f"### {r.module_label}:\n{self._format_items(r)}")
+        raw_data = "\n\n".join(data_sections)
 
-        def fmt_news(items):
-            return "\n".join(
-                f"- {n['title']}: {n['content'][:150]}"
-                for n in items
-                if n.get("title")
-            )
+        module_list = ", ".join(r.module_label for r in active)
+        prompt = f"""You are an elite AI market intelligence analyst. The data below was gathered over the last {days} days across {len(active)} research module(s): {module_list}.
 
-        def fmt_hn(items):
-            return "\n".join(
-                f"- [{i['points']}pts, {i['comments']} comments] {i['title']}"
-                for i in items
-                if i.get("title")
-            )
+Write a concise Market Intelligence Briefing in markdown. Use EXACTLY this structure:
 
-        prompt = f"""You are an elite AI market intelligence analyst. Based on the raw data below, write a concise Market Intelligence Briefing in markdown.
+{chr(10).join(f"## {r.module_label}" + chr(10) + "2-3 sharp, specific insights drawn from this module's data. Name sources, techniques, figures, and implications. No generic statements." for r in active)}
 
-STRUCTURE (use EXACTLY these H2 headings):
+## Cross-Module Synthesis
+What patterns or contradictions emerge across ALL the modules above? What is the single most important signal a LinkedIn AI thought leader should act on right now?
 
-## Vector 1: The Alpha (Technical Shifts)
-Identify the 2-3 most significant technical breakthroughs or research directions from the ArXiv papers. Be specific — name techniques, numbers, implications.
-
-## Vector 2: The Hype (Marketing Shifts)
-From the tech news, identify what narratives are being pushed by companies and media. What are they over-emphasizing? What is being spun?
-
-## Vector 3: The Gap (Opportunity)
-Cross-reference all three sources. What important problem or angle is NOT being addressed? Where is the whitespace? What should practitioners actually pay attention to?
+## The Contrarian Angle
+What important story is being overlooked or mis-framed across these sources? Where is the whitespace? What should practitioners actually pay attention to instead?
 
 ---
 RAW DATA:
 
-### ArXiv Papers (last 7 days):
-{fmt_arxiv(v1_arxiv)}
-
-### Tech News:
-{fmt_news(v2_news)}
-
-### Hacker News (developer pulse):
-{fmt_hn(v3_hn)}
+{raw_data}
 ---
 
-Write the briefing now. Be sharp, contrarian where warranted, and specific. No generic statements."""
+Write the briefing now. Be sharp, specific, and contrarian where warranted."""
 
         llm = ChatOllama(
             model=self._ollama_model,
             base_url=self._ollama_base_url,
             temperature=0.7,
+            num_ctx=8192,
         )
         response = llm.invoke([HumanMessage(content=prompt)])
         return response.content
@@ -198,38 +126,63 @@ Write the briefing now. Be sharp, contrarian where warranted, and specific. No g
     # Main runner
     # ------------------------------------------------------------------
 
-    def run(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> str:
+    def run(
+        self,
+        modules: list[str],
+        days: int = 7,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+    ) -> str:
         """
-        Run the full Pulse Scout pipeline.
+        Run the selected Pulse Scout modules and synthesise results.
 
         Args:
-            progress_callback: Optional callable(step, total) for progress tracking.
+            modules:           List of module IDs to run (keys of MODULE_REGISTRY).
+            days:              Time window in days (0 = no filter).
+            progress_callback: Optional callable(step, total) for UI progress tracking.
 
         Returns:
             The markdown report string (also saved to outputs/pulse_report.md).
         """
+        selected = [self.MODULE_REGISTRY[m] for m in modules if m in self.MODULE_REGISTRY]
+        total_steps = len(selected) + 1  # scans + synthesis
+
         def _tick(step: int):
             if progress_callback:
-                progress_callback(step, self.TOTAL_STEPS)
+                progress_callback(step, total_steps)
 
         _tick(0)
-        v1 = self.scan_vector_1_arxiv()
-        _tick(1)
+        scan_results: list[ScanResult] = []
+        for i, scanner in enumerate(selected):
+            try:
+                result = scanner.scan(days=days)
+            except Exception as e:
+                result = ScanResult(
+                    module_id=scanner.MODULE_ID,
+                    module_label=scanner.MODULE_LABEL,
+                    items=[],
+                    error=str(e),
+                )
+            scan_results.append(result)
+            _tick(i + 1)
 
-        v2 = self.scan_vector_2_tech_news()
-        _tick(2)
+        report_md = self.synthesize(scan_results, days=days)
+        _tick(total_steps)
 
-        v3 = self.scan_vector_3_dev_community()
-        _tick(3)
-
-        report_md = self.synthesize(v1, v2, v3)
-        _tick(4)
-
-        # Prepend a header with timestamp
+        # Prepend a header with timestamp and config summary
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        full_report = f"# Market Intelligence Briefing\n_Generated: {timestamp}_\n\n{report_md}"
+        module_labels = ", ".join(s.MODULE_LABEL for s in selected)
+        full_report = (
+            f"# Market Intelligence Briefing\n"
+            f"_Generated: {timestamp} · Modules: {module_labels} · Last {days} days_\n\n"
+            f"{report_md}"
+        )
 
-        # Save to outputs/
+        # Append any scanner errors as a footnote
+        errors = [(r.module_label, r.error) for r in scan_results if r.error]
+        if errors:
+            error_lines = "\n".join(f"- **{label}**: {err}" for label, err in errors)
+            full_report += f"\n\n---\n_Scanner warnings:_\n{error_lines}"
+
         output_path = Path("outputs") / "pulse_report.md"
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(full_report)

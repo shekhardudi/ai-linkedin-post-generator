@@ -33,9 +33,19 @@ from linkedin_post_generator.utils.user_profile import load_user_profile
 # ---------------------------------------------------------------------------
 # Session state initialisation
 # ---------------------------------------------------------------------------
+MODULE_OPTIONS = {
+    "Community Sentiment": "community_sentiment",
+    "Technical Deep Dive": "technical_deep_dive",
+    "Tooling & Tactics": "tooling_and_tactics",
+    "Long-form Strategy": "long_form_strategy",
+    "Expert Synthesis": "expert_synthesis",
+}
+
 defaults = {
     "pulse_md": "",
     "pulse_done": False,
+    "pulse_selected_modules": list(MODULE_OPTIONS.keys()),
+    "pulse_days": 7,
     "imported_topic": "",
     "post_draft": "",
     "image_path": "",
@@ -109,6 +119,16 @@ def find_latest_image() -> str:
     return str(images[0]) if images else ""
 
 
+def _convert_to_days(value: int, unit: str) -> int:
+    return value * {"days": 1, "weeks": 7, "months": 30, "years": 365}[unit]
+
+
+def check_readability(text: str) -> list[str]:
+    """Return sentences with more than 15 words — flagged as too dense for LinkedIn."""
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [s for s in sentences if s and len(s.split()) > 15]
+
+
 # ---------------------------------------------------------------------------
 # Sidebar
 # ---------------------------------------------------------------------------
@@ -139,13 +159,15 @@ with st.sidebar:
 
     # Reset
     if st.button("🔄 Reset Session", use_container_width=True):
-        for key in ["pulse_done", "crew_done", "post_draft", "image_path", "crew_raw_output", "imported_topic"]:
+        for key in ["pulse_done", "crew_done", "post_draft", "image_path", "crew_raw_output", "imported_topic", "pulse_md"]:
             st.session_state[key] = False if isinstance(st.session_state[key], bool) else ""
+        st.session_state.pulse_selected_modules = list(MODULE_OPTIONS.keys())
+        st.session_state.pulse_days = 7
         st.session_state.cost_tracker = CostTracker()
         st.rerun()
 
     st.divider()
-    st.caption("**Engines:**\n\n🛰️ Pulse Scout — Ollama + ArXiv + HN\n\n🏗️ Authority Crew — GPT-4o + Claude + DALL-E")
+    st.caption("**Engines:**\n\n🛰️ Pulse Scout — Ollama + 5 configurable modules\n\n🏗️ Authority Crew — GPT-4o + Claude + DALL-E")
 
 # ---------------------------------------------------------------------------
 # Main layout
@@ -157,45 +179,74 @@ st.caption("Dual-engine AI system: local intelligence briefing → premium post 
 # SECTION 1 — Intelligence Feed (Pulse Scout)
 # ===========================================================================
 st.header("1 · Intelligence Feed", divider="gray")
-st.caption("Pulse Scout scans ArXiv, tech news, and Hacker News to surface market signals.")
 
+# --- Module & time range configuration ---
+selected_labels = st.multiselect(
+    "Research Modules",
+    options=list(MODULE_OPTIONS.keys()),
+    default=st.session_state.pulse_selected_modules,
+    help="Select one or more modules to research",
+    disabled=st.session_state.pulse_done,
+)
+selected_modules = [MODULE_OPTIONS[l] for l in selected_labels]
+
+col_val, col_unit, col_info = st.columns([1, 2, 3])
+time_value = col_val.number_input(
+    "Time window", min_value=1, max_value=730,
+    value=st.session_state.pulse_days,
+    disabled=st.session_state.pulse_done,
+)
+time_unit = col_unit.selectbox(
+    "Unit", ["days", "weeks", "months", "years"],
+    disabled=st.session_state.pulse_done,
+)
+days = _convert_to_days(int(time_value), time_unit)
+col_info.caption(f"Scanning the last **{days} days** across **{len(selected_modules)}** module(s)")
+
+# --- Run button row ---
 col_run, col_status = st.columns([2, 3])
 
 with col_run:
-    scout_disabled = st.session_state.pulse_done or not ollama_ok
+    scout_disabled = st.session_state.pulse_done or not ollama_ok or not selected_modules
     if st.button(
         "▶ Run Pulse Scout",
         disabled=scout_disabled,
         use_container_width=True,
         type="primary",
     ):
+        st.session_state.pulse_selected_modules = selected_labels
+        st.session_state.pulse_days = int(time_value)
+
         from linkedin_post_generator.engines.pulse_scout import PulseScout
 
         scout = PulseScout()
         progress_bar = st.progress(0, text="Initialising...")
-        status_text = st.empty()
+
+        # Build dynamic progress labels from selected module names
+        _labels: dict[int, str] = {i: f"Scanning {selected_labels[i]}..." for i in range(len(selected_labels))}
+        _labels[len(selected_labels)] = "Synthesising with Ollama..."
+        _labels[len(selected_labels) + 1] = "Complete!"
 
         def _progress_cb(step: int, total: int):
             pct = step / total
-            labels = {
-                0: "Starting scan...",
-                1: "✓ ArXiv scanned — fetching tech news...",
-                2: "✓ Tech news done — scanning Hacker News...",
-                3: "✓ HN scanned — synthesising with Ollama...",
-                4: "✓ Synthesis complete!",
-            }
-            progress_bar.progress(pct, text=labels.get(step, f"Step {step}/{total}"))
+            progress_bar.progress(pct, text=_labels.get(step, f"Step {step}/{total}"))
 
         try:
-            report = scout.run(progress_callback=_progress_cb)
+            report = scout.run(
+                modules=selected_modules,
+                days=days,
+                progress_callback=_progress_cb,
+            )
             st.session_state.pulse_md = report
             st.session_state.pulse_done = True
             progress_bar.empty()
-            status_text.empty()
             st.rerun()
         except Exception as e:
             progress_bar.empty()
             st.error(f"Pulse Scout failed: {e}")
+
+    if not selected_modules and not st.session_state.pulse_done:
+        st.warning("Select at least one module to run Pulse Scout.")
 
 with col_status:
     if st.session_state.pulse_done:
@@ -203,7 +254,7 @@ with col_status:
     elif not ollama_ok:
         st.warning("Ollama must be running to use Pulse Scout")
     else:
-        st.info("Run Pulse Scout to generate your daily intelligence briefing")
+        st.info("Configure modules and time range, then run Pulse Scout")
 
 # Display pulse report
 if st.session_state.pulse_md:
@@ -252,13 +303,24 @@ with col_left:
         help="The subject of your post",
     )
     leader_angle = st.text_area(
-        "Your Angle / Perspective",
+        "Your Take (The Human Bridge)",
         placeholder=(
-            "What's your actual take? e.g. 'MoE is overhyped for inference cost "
-            "— the routing overhead kills the savings at small batch sizes'"
+            "What do YOU actually think? This becomes the soul of the post.\n"
+            "e.g. 'MoE is overhyped for inference cost — routing overhead kills "
+            "the savings at small batch sizes'"
         ),
-        height=120,
-        help="Tell the AI what YOU actually think. This becomes the contrarian angle.",
+        height=100,
+        help="Required for a human-sounding post. Your opinion is what separates a great post from an AI summary.",
+    )
+    author_vibe = st.text_area(
+        "Mood / Tone for this post",
+        placeholder=(
+            "e.g. 'Skeptical — I think this is overhyped'\n"
+            "'Excited but cautious — I've seen v1 fail before'\n"
+            "'Direct and contrarian — push back on the consensus'"
+        ),
+        height=80,
+        help="Seeds the writer agent's tone. Leave blank for default: calm, direct, slightly skeptical.",
     )
 
 with col_right:
@@ -286,6 +348,7 @@ if st.button(
             "author_name": author_name,
             "author_title": author_title,
             "author_location": author_location,
+            "author_vibe": author_vibe.strip() or "calm, direct, and slightly skeptical",
             "current_year": str(__import__("datetime").datetime.now().year),
         }
 
@@ -331,8 +394,15 @@ if st.session_state.post_draft or st.session_state.image_path:
 
     with col_post:
         st.subheader("Post Draft")
-        char_count = len(st.session_state.post_draft)
-        st.caption(f"Character count: {char_count} {'✓' if 1200 <= char_count <= 1800 else '⚠️ aim for 1200-1800'}")
+
+        # Body char count (exclude trailing hashtags for accurate limit check)
+        _body = re.split(r"\n+#", st.session_state.post_draft)[0].strip()
+        char_count = len(_body)
+        char_ok = char_count <= 1000
+        st.caption(
+            f"Body: {char_count} chars {'✓ under 1000' if char_ok else '⚠️ over 1000 — needs trimming'} "
+            f"| Total: {len(st.session_state.post_draft)} chars"
+        )
 
         edited_post = st.text_area(
             "Edit before publishing",
@@ -340,6 +410,15 @@ if st.session_state.post_draft or st.session_state.image_path:
             height=400,
             label_visibility="collapsed",
         )
+
+        # Readability check
+        dense = check_readability(edited_post)
+        if dense:
+            with st.expander(f"⚠️ Readability — {len(dense)} dense sentence(s) (>15 words)", expanded=False):
+                for s in dense:
+                    st.warning(s)
+        else:
+            st.caption("✓ Readability passed — all sentences under 15 words")
 
     with col_img:
         st.subheader("Generated Visual")
