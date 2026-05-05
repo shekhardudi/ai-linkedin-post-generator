@@ -28,11 +28,15 @@ research_task:
     - What would a skeptical senior engineer object to?
     - What has gone wrong in real deployments of this tech?
 
-    Search ArXiv for technical papers. Use Tavily for news, company blogs, and
-    search for BOTH success reports from practitioners AND criticism, failure reports,
-    and limitations. The goal is a balanced, accurate picture — not pure skepticism.
+    PART C — THE EMOTIONAL BEATS:
+    Capture the FEELING a practitioner has about this topic right now. Pick exactly
+    THREE short phrases (2-4 words each), specific to a practitioner pain or win.
+    Examples (do not reuse): "quiet relief", "delayed buyer's remorse",
+    "vindicated skepticism", "hard-won confidence", "weary fatigue",
+    "cautious optimism after burn-in".
+    Do NOT use vague abstractions like "excitement", "curiosity", or "hope".
   expected_output: >
-    A structured Fact Sheet in markdown with these exact sections:
+    A structured Fact Sheet in markdown with these EXACT sections:
 
     ## Key Findings
     (5-7 bullet points of the most important, citable facts)
@@ -43,9 +47,11 @@ research_task:
     ## Data Points & Quotes
     (Specific numbers, benchmark results, or notable quotes with attribution)
 
-    ## The Reality Check (Genuine Wins, Myths, Trade-offs & Failure Modes)
-    (2-4 bullet points — what actually works in practice, what critics say,
-    what the tech can't do yet, what marketers are hiding, real failure scenarios)
+    ## The Reality Check
+    (2-4 bullet points — what works, what's myth, what's failing in production)
+
+    ## Emotional Beats
+    (Exactly 3 phrases of 2-4 words each, on separate lines, prefixed with "- ")
 
     ## Sources
     (List of URLs used — at least 3 sources)
@@ -79,8 +85,9 @@ writing_task:
       Option E — The honest reframe: "I had the wrong mental model for [X]. Here's the right one."
     NEVER start with: "I'm excited", "Hot take:", "Thread:", or a question.
     NEVER use a generic opening. Make it specific to the topic.
-    Choose the hook type that best fits the tone of the Fact Sheet — if the Reality
-    Check section shows genuine practitioner wins, lean toward Option D or E.
+    Whichever hook you choose, it MUST contain at least one concrete noun pulled
+    from the Fact Sheet — a specific paper, model name, company, or benchmark.
+    Forced numbers or fake time anchors are WORSE than a clean opinion hook.
 
     PART 2 — THE BRAIN (2-4 short blocks, max 2 lines each):
     Connect the technical reality to a real engineering or business pain point.
@@ -97,9 +104,8 @@ writing_task:
       "What worked better than expected was..."
       "Here's what I got wrong — and what actually works:"
       "The thing that surprised me most was..."
-    Ground this in the Reality Check section of the Fact Sheet. If the data shows
-    genuine wins, use a constructive opener. If the data shows failure modes, use
-    a cautionary one. Match the opener to the evidence.
+    The SOUL line MUST reference a concrete artifact from the Fact Sheet
+    (specific paper, benchmark, or company) — not generic "I've seen this".
 
     PART 4 — THE GIFT (exactly 3 bullet points using the • character):
     Actionable, specific insights a practitioner can use today.
@@ -108,46 +114,39 @@ writing_task:
     PART 5 — THE HANDSHAKE (exactly 1 line CTA):
     A specific question that forces the reader to pick a side or share experience.
     BANNED CTAs: "What do you think?", "Would love your thoughts.", "Thoughts?"
-    GOOD CTAs: "Are you betting on X or Y for your 2026 stack?"
-               "Has your team hit this ceiling yet — and how did you get out?"
-               "Are you still on [old approach] or have you made the switch?"
 
     ═══════════════════
     STRICT FORMAT RULES
     ═══════════════════
-    1. Max 2 consecutive lines of text before a blank line. NEVER a wall of text.
+    1. Max 2 consecutive lines of text before a blank line. Never a wall of text.
+       Each line ≤ 220 characters. ≤ 7 line clusters total.
     2. First-person singular ONLY — "I", never "we", "one should", or passive voice.
     3. NO markdown inside the post: no **, no ##, no -. Use • for bullets ONLY.
-    4. STRICTLY under 1000 characters total (count the post body only, NOT hashtags).
-       Every word must earn its place. Cut ruthlessly.
-    5. 3-5 hashtags placed at the very end, after a blank line. Not counted in 1000 chars.
+    4. STRICTLY under 1200 characters total (count the post body only, NOT hashtags).
+    5. 3-5 hashtags placed at the very end, after a blank line.
     6. BANNED words — delete any of these wherever they appear:
        tapestry, delve, unlock, landscape, game-changer, exciting, revolutionary,
        groundbreaking, cutting-edge, synergy, leverage (as a verb), harness, unleash.
 
     After writing the post, count the characters manually and confirm the count
-    is under 1000 before finalizing.
+    is under 1200 before finalizing.
   expected_output: >
-    The LinkedIn post as plain text, exactly as it would appear when posted on LinkedIn.
-    No markdown formatting characters (no **, ##, -, etc.) inside the post body.
+    The LinkedIn post as plain text, exactly as it would appear when posted.
+    No markdown formatting characters inside the post body.
     Bullets use • only. Hashtags at the very end after a blank line.
-    Ready to copy-paste directly into LinkedIn. Under 1000 characters (body only).
+    Ready to copy-paste directly into LinkedIn. Under 1200 characters (body only).
   agent: thought_leader
   context:
     - research_task
 
 critique_task:
   description: >
-    You have two jobs in this task.
-
-    ══════════════════════
-    JOB 1 — THE BRUTAL EDIT
-    ══════════════════════
     Read the draft as a skeptical engineer who has seen too many AI-generated posts.
     Work through this checklist in order — fix every failure, don't skip any:
 
     CHECK 1 — THE HOOK:
     Does it stop the scroll in 2 lines or fewer? Is it specific and punchy?
+    Does it contain at least one concrete noun from the Fact Sheet?
     If it sounds generic, safe, or like a headline — rewrite it completely.
 
     CHECK 2 — THE SOUL:
@@ -157,7 +156,7 @@ critique_task:
     "Here's what I got wrong — and what actually works:", or
     "The thing that surprised me most was...")
     If MISSING — insert one anchored in the Reality Check section of the Fact Sheet.
-    This is NOT optional.
+    Must reference a concrete artifact (specific paper, benchmark, or company).
 
     CHECK 3 — THE CTA:
     Does the closing question force a choice or provoke a real debate?
@@ -169,70 +168,40 @@ critique_task:
     Delete every instance. Rewrite the sentence without them.
 
     CHECK 5 — CHARACTER COUNT:
-    Count the post body characters (excluding hashtags).
-    Must be STRICTLY under 1000 characters.
-    If over: cut filler phrases from THE BRAIN, shorten bullets in THE GIFT,
-    tighten every sentence. Do not cut THE HOOK or THE SOUL.
+    Count the post body characters (excluding hashtags). Must be STRICTLY under 1200.
+    If over: cut filler from THE BRAIN, shorten bullets in THE GIFT, tighten every
+    sentence. Do not cut THE HOOK or THE SOUL.
 
     CHECK 6 — WHITE SPACE:
     No block of text longer than 2 consecutive lines before a blank line.
-    Add line breaks wherever needed.
+    Each line ≤ 220 characters. ≤ 7 line clusters total.
 
     CHECK 7 — VOICE:
     Replace any "we", "one should", passive constructions, or corporate plural.
     First-person singular ("I") throughout.
 
     CHECK 8 — FACTUAL ACCURACY:
-    Cross-check every claim against the Fact Sheet from the researcher.
+    Cross-check every claim against the Fact Sheet's `## Sources`.
     If a claim is unsupported, hyperbolic, or unverified — rewrite or remove it.
 
-    CHECK 9 — HASHTAGS:
+    CHECK 9 — LLM SMELL:
+    Rewrite any sentence that smells like an LLM:
+      - "It's not just X, it's Y."
+      - Lists of three abstract nouns ("clarity, focus, and intent").
+      - Em-dash-heavy clauses stacked end-to-end.
+      - Empty intensifiers ("absolutely", "fundamentally", "truly").
+
+    CHECK 10 — HASHTAGS:
     Max 5, placed at the very end after a blank line. Remove any generic/weak ones.
 
-    ══════════════════════════════
-    JOB 2 — DALL-E 3 IMAGE PROMPT (write the prompt only — do NOT call any tool)
-    ══════════════════════════════
-    Before writing the prompt, extract these 3 specific elements from the finalized post:
-
-    ELEMENT 1: The core technology noun — be precise, not generic.
-      Examples: "RAG retrieval pipeline", "BitNet 1-bit quantization chip",
-      "multi-agent task graph", "fine-tuned embedding model", "sparse MoE router".
-      NOT acceptable: "AI", "machine learning", "technology".
-
-    ELEMENT 2: The emotional register of the post — e.g. "skeptical pragmatism",
-      "cautious optimism", "hard-won confidence", "honest reassessment".
-
-    ELEMENT 3: A physical metaphor derived specifically from ELEMENT 1 — not generic
-      server racks unless the post is literally about servers.
-      Examples: RAG → filing cabinet with light beams; quantization → compression
-      press; agents → switchboard or decision tree; embeddings → coordinate grid.
-
-    Build the DALL-E prompt around ELEMENT 1 and ELEMENT 3. Choose ONE style:
-
-    Style A — Minimalist Brutalist: derive the subject directly from ELEMENT 1+3.
-      Stark architectural or industrial forms, deep contrast, one accent color,
-      cinematic lighting, no text, no people. Think Wired or MIT Technology Review.
-
-    Style B — Technical Diagram: the topology MUST mirror ELEMENT 1 specifically.
-      RAG post → retrieval + generation flow diagram; quantization → bit-compression
-      layers; agents → decision graph; embeddings → vector space scatter.
-      Dark background, nodes/connections in muted amber or cyan, no text overlays.
-
-    The prompt must be 150-200 words, highly specific to ELEMENT 1, and must NOT
-    include: robot hands, lightbulbs, brain graphics, circuit boards overlaid on
-    faces, glowing orbs, generic "AI" imagery, or any cliché tech stock photo
-    elements. Think: industrial macro photography, architectural minimalism,
-    or editorial science diagrams.
+    Do NOT produce any image prompt — that step happens downstream.
   expected_output: >
-    Your response must have EXACTLY these two sections with these exact headings:
+    Your response must have EXACTLY this section heading and nothing else:
 
     ## Finalized Post
-    (The corrected, final LinkedIn post — plain text, under 1000 characters body,
+    (The corrected, final LinkedIn post — plain text, under 1200 characters body,
     hashtags at the end, ready to copy-paste)
-
-    ## DALL-E Prompt
-    (The image generation prompt text only — 150-200 words, no cliché AI imagery)
-  agent: critic_visual_director
+  agent: critic
   context:
     - research_task
     - writing_task

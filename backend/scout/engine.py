@@ -11,41 +11,40 @@ Five configurable modules:
   expert_synthesis     — The Batch (Andrew Ng), HuggingFace weekly
 """
 
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import httpx
 from langchain_core.messages import HumanMessage
 
-from .pulse_scout_modules.base import BaseScanner, ScanResult
-from .pulse_scout_modules.community_sentiment import CommunitySentimentScanner
-from .pulse_scout_modules.expert_synthesis import ExpertSynthesisScanner
-from .pulse_scout_modules.long_form_strategy import LongFormStrategyScanner
-from .pulse_scout_modules.technical_deep_dive import TechnicalDeepDiveScanner
-from .pulse_scout_modules.tooling_and_tactics import ToolingAndTacticsScanner
+from backend.core.settings import get_settings
+
+from .modules.base import BaseScanner, ScanResult
+from .modules.community_sentiment import CommunitySentimentScanner
+from .modules.expert_synthesis import ExpertSynthesisScanner
+from .modules.long_form_strategy import LongFormStrategyScanner
+from .modules.technical_deep_dive import TechnicalDeepDiveScanner
+from .modules.tooling_and_tactics import ToolingAndTacticsScanner
 
 
 class PulseScout:
-    """
-    Orchestrates 5 pluggable intelligence modules and synthesises results
-    via either a local Ollama LLM or OpenAI GPT-4o-mini (configurable).
+    """Orchestrates 5 pluggable intelligence modules.
 
-    Config (environment variables):
-      SCOUT_USE_OPENAI=true    → use GPT-4o-mini for synthesis (no Ollama required)
-      SCOUT_USE_OPENAI=false   → use local Ollama (default)
-      SCOUT_OPENAI_MODEL       → override OpenAI model (default: gpt-4o-mini)
-      OLLAMA_BASE_URL          → Ollama server URL (default: http://localhost:11434)
-      OLLAMA_MODEL             → Ollama model name (default: llama3.1)
+    Synthesis runs via either a local Ollama LLM or an OpenAI model. All
+    settings (which backend, which model, temperature, ctx window) come from
+    `backend.core.settings.Settings` — override via env vars or `.env`.
     """
 
     def __init__(self):
-        self._ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        self._ollama_model = os.getenv("OLLAMA_MODEL", "llama3.1")
-        self._tavily_key = os.environ.get("TAVILY_API_KEY", "")
-        self._use_openai = os.getenv("SCOUT_USE_OPENAI", "false").lower() == "true"
-        self._openai_model = os.getenv("SCOUT_OPENAI_MODEL", "gpt-4o-mini")
+        s = get_settings()
+        self._ollama_base_url = s.ollama_base_url
+        self._ollama_model = s.ollama_model
+        self._ollama_num_ctx = s.ollama_num_ctx
+        self._tavily_key = s.tavily_api_key
+        self._use_openai = s.scout_use_openai
+        self._openai_model = s.scout_openai_model
+        self._synthesis_temperature = s.scout_synthesis_temperature
 
         self.MODULE_REGISTRY: dict[str, BaseScanner] = {
             "community_sentiment": CommunitySentimentScanner(self._tavily_key),
@@ -94,11 +93,16 @@ class PulseScout:
             lines.append(line)
         return "\n".join(lines)
 
-    def synthesize(self, results: list[ScanResult], days: int) -> str:
-        """Call local Ollama to synthesize a structured intelligence briefing."""
+    def synthesize(self, results: list[ScanResult], days: int) -> tuple[str, dict]:
+        """Call local Ollama / OpenAI to synthesize a structured intelligence briefing.
+
+        Returns (markdown, usage_meta) where usage_meta is
+        ``{"model": str, "input_tokens": int, "output_tokens": int, "total_tokens": int}``
+        when the provider reports usage; otherwise zeros.
+        """
         active = [r for r in results if r.items]
         if not active:
-            return "_No data collected from the selected modules._"
+            return "_No data collected from the selected modules._", {}
 
         # Build the raw data block — one section per active module
         data_sections = []
@@ -129,17 +133,30 @@ Write the briefing now. Be sharp, specific, and contrarian where warranted."""
 
         if self._use_openai:
             from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(model=self._openai_model, temperature=0.7)
+            llm = ChatOpenAI(model=self._openai_model, temperature=self._synthesis_temperature)
+            model_name = f"openai/{self._openai_model}"
         else:
             from langchain_ollama import ChatOllama
             llm = ChatOllama(
                 model=self._ollama_model,
                 base_url=self._ollama_base_url,
-                temperature=0.7,
-                num_ctx=8192,
+                temperature=self._synthesis_temperature,
+                num_ctx=self._ollama_num_ctx,
             )
+            model_name = f"ollama/{self._ollama_model}"
         response = llm.invoke([HumanMessage(content=prompt)])
-        return response.content
+
+        usage = getattr(response, "usage_metadata", None) or {}
+        meta = (getattr(response, "response_metadata", None) or {}).get("token_usage") or {}
+        input_tokens = int(usage.get("input_tokens") or meta.get("prompt_tokens") or 0)
+        output_tokens = int(usage.get("output_tokens") or meta.get("completion_tokens") or 0)
+        usage_meta = {
+            "model": model_name,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+        }
+        return response.content, usage_meta
 
     # ------------------------------------------------------------------
     # Main runner
@@ -149,8 +166,8 @@ Write the briefing now. Be sharp, specific, and contrarian where warranted."""
         self,
         modules: list[str],
         days: int = 7,
-        progress_callback: Optional[Callable[[int, int], None]] = None,
-    ) -> str:
+        progress_callback: Optional[Callable[[int, int, Optional[dict[str, Any]]], None]] = None,
+    ) -> tuple[str, dict]:
         """
         Run the selected Pulse Scout modules and synthesise results.
 
@@ -160,20 +177,32 @@ Write the briefing now. Be sharp, specific, and contrarian where warranted."""
             progress_callback: Optional callable(step, total) for UI progress tracking.
 
         Returns:
-            The markdown report string (also saved to outputs/pulse_report.md).
+            ``(markdown_report, cost_breakdown)`` where ``cost_breakdown`` matches
+            the shape consumed by the frontend ``CostTracker`` component.
         """
         selected = [self.MODULE_REGISTRY[m] for m in modules if m in self.MODULE_REGISTRY]
         total_steps = len(selected) + 1  # scans + synthesis
 
-        def _tick(step: int):
+        def _tick(step: int, meta: Optional[dict[str, Any]] = None):
             if progress_callback:
-                progress_callback(step, total_steps)
+                progress_callback(step, total_steps, meta)
 
-        _tick(0)
+        _tick(0, {
+            "module": selected[0].MODULE_ID if selected else "synthesis",
+            "phase": "started",
+            "message": "Scout run started.",
+        })
         scan_results: list[ScanResult] = []
         for i, scanner in enumerate(selected):
+            _tick(i, {
+                "module": scanner.MODULE_ID,
+                "phase": "started",
+                "message": f"Running {scanner.MODULE_LABEL}…",
+            })
             try:
                 result = scanner.scan(days=days)
+                phase = "done"
+                message = f"Completed {scanner.MODULE_LABEL} ({len(result.items)} items)."
             except Exception as e:
                 result = ScanResult(
                     module_id=scanner.MODULE_ID,
@@ -181,11 +210,27 @@ Write the briefing now. Be sharp, specific, and contrarian where warranted."""
                     items=[],
                     error=str(e),
                 )
+                phase = "error"
+                message = f"{scanner.MODULE_LABEL} failed: {e}"
             scan_results.append(result)
-            _tick(i + 1)
+            _tick(i + 1, {
+                "module": scanner.MODULE_ID,
+                "phase": phase,
+                "message": message,
+            })
 
-        report_md = self.synthesize(scan_results, days=days)
-        _tick(total_steps)
+        _tick(len(selected), {
+            "module": "synthesis",
+            "phase": "started",
+            "message": "Synthesizing final briefing…",
+        })
+
+        report_md, usage_meta = self.synthesize(scan_results, days=days)
+        _tick(total_steps, {
+            "module": "synthesis",
+            "phase": "done",
+            "message": "Briefing generated.",
+        })
 
         # Prepend a header with timestamp and config summary
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -206,4 +251,22 @@ Write the briefing now. Be sharp, specific, and contrarian where warranted."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(full_report)
 
-        return full_report
+        # Build cost_breakdown in the same shape the frontend already consumes.
+        from backend.core.pricing import text_cost
+
+        model = usage_meta.get("model", "")
+        in_tok = int(usage_meta.get("input_tokens", 0))
+        out_tok = int(usage_meta.get("output_tokens", 0))
+        cost_usd = round(text_cost(model, in_tok, out_tok), 6) if model else 0.0
+        cost_breakdown = {
+            "scout": {
+                "model": model,
+                "prompt_tokens": in_tok,
+                "completion_tokens": out_tok,
+                "total_tokens": in_tok + out_tok,
+                "cost_usd": cost_usd,
+            },
+            "total_cost_usd": cost_usd,
+        }
+
+        return full_report, cost_breakdown

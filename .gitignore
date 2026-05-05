@@ -11,3 +11,12 @@ run.txt
 settings.json
 settings.local.json
 user_preference.txt
+
+# Terraform
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate
+deploy/terraform/*.tfstate.backup
+deploy/terraform/.terraform.lock.hcl
+deploy/terraform/terraform.tfvars
+
+deploy/

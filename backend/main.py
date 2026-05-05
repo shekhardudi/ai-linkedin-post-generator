@@ -1,15 +1,22 @@
 #!/usr/bin/env python
+"""CLI entry points for the LinkedIn Post Generator backend."""
+
 import json
 import subprocess
 import sys
 import warnings
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
+from pathlib import Path
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-from linkedin_post_generator.engines.authority_crew.crew import AuthorityCrew
-from linkedin_post_generator.utils.user_profile import load_user_profile
+from backend.post_generator.crew import AuthorityCrew
+from backend.utils.user_profile import load_user_profile
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _default_inputs() -> dict:
     profile = load_user_profile()
@@ -27,23 +34,29 @@ def _default_inputs() -> dict:
     }
 
 
+def _project_root() -> Path:
+    """Repo root — backend/main.py lives at <root>/backend/main.py."""
+    return Path(__file__).resolve().parent.parent
+
+
+# ---------------------------------------------------------------------------
+# Crew — single-shot
+# ---------------------------------------------------------------------------
+
 def run():
     """Run the Authority Crew (CLI entry point)."""
-    try:
-        AuthorityCrew().crew().kickoff(inputs=_default_inputs())
-    except Exception as e:
-        raise Exception(f"An error occurred while running the crew: {e}")
+    AuthorityCrew().crew().kickoff(inputs=_default_inputs())
 
 
 def run_scout():
-    """Run Pulse Scout engine (CLI entry point) — all 5 modules, last 7 days."""
-    from linkedin_post_generator.engines.pulse_scout import PulseScout
+    """Run Pulse Scout — all 5 modules, last 7 days."""
+    from backend.scout.engine import PulseScout
 
     scout = PulseScout()
 
-    if not scout.check_ollama_health():
-        print("ERROR: Ollama is not reachable at the configured URL.")
-        print("Start Ollama with: ollama serve")
+    if not scout._use_openai and not scout.check_ollama_health():
+        print("ERROR: Ollama is not reachable and SCOUT_USE_OPENAI is not set.")
+        print("Start Ollama with: ollama serve  OR  export SCOUT_USE_OPENAI=true")
         sys.exit(1)
 
     all_modules = list(scout.MODULE_REGISTRY.keys())
@@ -52,7 +65,7 @@ def run_scout():
         if step == total:
             print(f"  [{step}/{total}] Synthesis complete!")
         elif step == total - 1:
-            print(f"  [{step}/{total}] Synthesising with Ollama...")
+            print(f"  [{step}/{total}] Synthesising...")
         elif step < len(all_modules):
             label = scout.MODULE_REGISTRY[all_modules[step]].MODULE_LABEL
             print(f"  [{step}/{total}] Scanning {label}...")
@@ -63,56 +76,65 @@ def run_scout():
     print(report[:600] + "..." if len(report) > 600 else report)
 
 
+# ---------------------------------------------------------------------------
+# API + UI launchers
+# ---------------------------------------------------------------------------
+
+def run_api():
+    """Launch the FastAPI backend on :8000."""
+    import uvicorn
+
+    uvicorn.run(
+        "backend.api.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )
+
+
 def run_app():
-    """Launch the Streamlit UI."""
-    import os
-    from pathlib import Path
+    """Launch the Streamlit UI (talks to the FastAPI backend over HTTP)."""
+    ui_path = _project_root() / "ui" / "streamlit_app.py"
+    subprocess.run(["streamlit", "run", str(ui_path)], check=True)
 
-    app_path = Path(__file__).parent.parent.parent.parent / "app.py"
-    subprocess.run(["streamlit", "run", str(app_path)], check=True)
 
+# ---------------------------------------------------------------------------
+# CrewAI tooling helpers (training / replay / test / trigger)
+# ---------------------------------------------------------------------------
 
 def train():
     """Train the crew for a given number of iterations."""
-    try:
-        AuthorityCrew().crew().train(
-            n_iterations=int(sys.argv[1]),
-            filename=sys.argv[2],
-            inputs=_default_inputs(),
-        )
-    except Exception as e:
-        raise Exception(f"An error occurred while training the crew: {e}")
+    AuthorityCrew().crew().train(
+        n_iterations=int(sys.argv[1]),
+        filename=sys.argv[2],
+        inputs=_default_inputs(),
+    )
 
 
 def replay():
     """Replay the crew execution from a specific task."""
-    try:
-        AuthorityCrew().crew().replay(task_id=sys.argv[1])
-    except Exception as e:
-        raise Exception(f"An error occurred while replaying the crew: {e}")
+    AuthorityCrew().crew().replay(task_id=sys.argv[1])
 
 
 def test():
     """Test the crew execution and return results."""
-    try:
-        AuthorityCrew().crew().test(
-            n_iterations=int(sys.argv[1]),
-            eval_llm=sys.argv[2],
-            inputs=_default_inputs(),
-        )
-    except Exception as e:
-        raise Exception(f"An error occurred while testing the crew: {e}")
+    AuthorityCrew().crew().test(
+        n_iterations=int(sys.argv[1]),
+        eval_llm=sys.argv[2],
+        inputs=_default_inputs(),
+    )
 
 
 def run_with_trigger():
     """Run the crew with a JSON trigger payload."""
     if len(sys.argv) < 2:
-        raise Exception("No trigger payload provided. Please provide JSON payload as argument.")
+        raise SystemExit("No trigger payload provided. Pass JSON as argv[1].")
 
     try:
         trigger_payload = json.loads(sys.argv[1])
-    except json.JSONDecodeError:
-        raise Exception("Invalid JSON payload provided as argument")
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Invalid JSON payload: {exc}")
 
     inputs = {
         **_default_inputs(),
@@ -121,7 +143,4 @@ def run_with_trigger():
         "leader_angle": trigger_payload.get("leader_angle", ""),
     }
 
-    try:
-        return AuthorityCrew().crew().kickoff(inputs=inputs)
-    except Exception as e:
-        raise Exception(f"An error occurred while running the crew with trigger: {e}")
+    return AuthorityCrew().crew().kickoff(inputs=inputs)

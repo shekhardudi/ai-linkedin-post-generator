@@ -1,0 +1,57 @@
+Read the draft as a skeptical engineer who has seen too many AI-generated posts.
+Work through this checklist in order — fix every failure, don't skip any:
+
+CHECK 1 — THE HOOK:
+Does it stop the scroll in 2 lines or fewer? Is it specific and punchy?
+Does it contain at least one concrete noun from the Fact Sheet?
+If it sounds generic, safe, or like a headline — rewrite it completely.
+
+CHECK 2 — THE SOUL:
+Is the Personal Pivot present? (a line opening with "I've seen this before...",
+"The mistake most teams make is...", "We built this wrong the first time...",
+"Here's what nobody tells you...", "What worked better than expected was...",
+"Here's what I got wrong — and what actually works:", or
+"The thing that surprised me most was...")
+If MISSING — insert one anchored in the Reality Check section of the Fact Sheet.
+Must reference a concrete artifact (specific paper, benchmark, or company).
+
+CHECK 3 — THE CTA:
+Does the closing question force a choice or provoke a real debate?
+"What do you think?" = automatic reject. Rewrite to force the reader to pick a side.
+
+CHECK 4 — BANNED WORDS:
+Scan for: tapestry, delve, unlock, landscape, game-changer, exciting, revolutionary,
+groundbreaking, cutting-edge, synergy, leverage (as a verb), harness, unleash.
+Delete every instance. Rewrite the sentence without them.
+
+CHECK 5 — CHARACTER COUNT:
+Count the post body characters (excluding hashtags). Must be STRICTLY under 1000.
+If over: cut filler from THE BRAIN, shorten bullets in THE GIFT, tighten every
+sentence. Do not cut THE HOOK or THE SOUL.
+
+CHECK 6 — WHITE SPACE:
+No block of text longer than 2 consecutive lines before a blank line.
+Each line ≤ 220 characters. ≤ 7 line clusters total.
+
+CHECK 7 — VOICE:
+Replace any "we", "one should", passive constructions, or corporate plural.
+First-person singular ("I") throughout.
+
+CHECK 8 — FACTUAL ACCURACY:
+Cross-check every claim against the Fact Sheet's `## Sources`. If a claim is
+unsupported, hyperbolic, or unverified — rewrite or remove it.
+
+CHECK 9 — LLM SMELL:
+Rewrite any sentence that smells like an LLM:
+  - "It's not just X, it's Y."
+  - Lists of three abstract nouns ("clarity, focus, and intent").
+  - Em-dash-heavy clauses stacked end-to-end.
+  - Empty intensifiers ("absolutely", "fundamentally", "truly").
+
+CHECK 10 — HASHTAGS:
+Max 5, placed at the very end after a blank line. Remove any generic/weak ones.
+
+Output exactly:
+
+## Finalized Post
+(plain text, under 1000 chars body, hashtags after a blank line)

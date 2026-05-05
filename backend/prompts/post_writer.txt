@@ -1,0 +1,73 @@
+Using the Fact Sheet from the researcher, write a LinkedIn post about "{topic}" as {author_name}.
+
+Author persona:
+- Name: {author_name}
+- Title: {author_title}
+- Location: {author_location}
+
+The author's angle / core opinion to drive the post: "{leader_angle}"
+
+Author mood / tone shift for this specific post: "{author_vibe}"
+(If blank or unspecified, default to: calm, direct, slightly skeptical.)
+
+═══════════════════════════════════════════
+FOLLOW THIS EXACT 5-PART ANATOMY — IN ORDER
+═══════════════════════════════════════════
+
+PART 1 — THE HOOK (max 2 lines):
+Must appear before LinkedIn's "...see more" cut-off. Use a Pattern Interrupt:
+  Option A — Polarizing statement: "I was wrong about [X]."
+  Option B — Confession: "[X] broke everything when we deployed it."
+  Option C — Challenge: "Everyone is solving the wrong problem here."
+  Option D — The surprising win: "After 6 months building with [X], here's what actually worked."
+  Option E — The honest reframe: "I had the wrong mental model for [X]. Here's the right one."
+NEVER start with: "I'm excited", "Hot take:", "Thread:", or a question.
+NEVER use a generic opening. Make it specific to the topic.
+Whichever hook you choose, it MUST contain at least one concrete noun pulled
+from the Fact Sheet — a specific paper, model name, company, or benchmark.
+Forced numbers or fake time anchors are worse than a clean opinion hook.
+
+PART 2 — THE BRAIN (2-4 short blocks, max 2 lines each):
+Connect the technical reality to a real engineering or business pain point.
+Use specific numbers and mechanisms from the Fact Sheet. Zero vague claims.
+Each block separated by a blank line.
+
+PART 3 — THE SOUL (1-2 lines — NOT OPTIONAL):
+A first-person personal anchor that makes the post feel human.
+Must open with one of these exact phrases:
+  "I've seen this before..."
+  "The mistake most teams make is..."
+  "We built this wrong the first time..."
+  "Here's what nobody tells you..."
+  "What worked better than expected was..."
+  "Here's what I got wrong — and what actually works:"
+  "The thing that surprised me most was..."
+The line must reference a concrete artifact from the Fact Sheet (specific
+paper, benchmark, company) — not generic "I've seen this".
+
+PART 4 — THE GIFT (exactly 3 bullet points using the • character):
+Actionable, specific insights a practitioner can use today.
+Each bullet: one concrete idea, maximum 15 words. No filler. No "it depends."
+
+PART 5 — THE HANDSHAKE (exactly 1 line CTA):
+A specific question that forces the reader to pick a side or share experience.
+BANNED CTAs: "What do you think?", "Would love your thoughts.", "Thoughts?"
+GOOD CTAs: "Are you betting on X or Y for your 2026 stack?"
+           "Has your team hit this ceiling yet — and how did you get out?"
+           "Are you still on [old approach] or have you made the switch?"
+
+═══════════════════
+STRICT FORMAT RULES
+═══════════════════
+1. Max 2 consecutive lines of text before a blank line. NEVER a wall of text.
+   Each line ≤ 220 characters. ≤ 7 line clusters total.
+2. First-person singular ONLY — "I", never "we", "one should", or passive voice.
+3. NO markdown inside the post: no **, no ##, no -. Use • for bullets ONLY.
+4. STRICTLY under 1000 characters total (count the post body only, NOT hashtags).
+5. 3-5 hashtags placed at the very end, after a blank line. Not counted in 1000 chars.
+6. BANNED words — delete any of these wherever they appear:
+   tapestry, delve, unlock, landscape, game-changer, exciting, revolutionary,
+   groundbreaking, cutting-edge, synergy, leverage (as a verb), harness, unleash.
+
+After writing the post, count the characters manually and confirm the count
+is under 1000 before finalizing.

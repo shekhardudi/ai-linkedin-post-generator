@@ -9,7 +9,7 @@ def load_user_profile() -> dict:
     if not knowledge_path.exists():
         return {
             "name": "AI Professional",
-            "title": "AI Engineer",
+            "title": "Lead AI Engineer",
             "location": "Melbourne, Australia",
         }
 

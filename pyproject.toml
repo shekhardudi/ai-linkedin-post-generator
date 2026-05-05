@@ -1,12 +1,12 @@
 [project]
 name = "linkedin_post_generator"
-version = "0.1.0"
-description = "LinkedIn Post Generator — Dual Engine (Pulse Scout + Authority Crew) with Streamlit UI"
-authors = [{ name = "Your Name", email = "you@example.com" }]
+version = "0.2.0"
+description = "LinkedIn Post Generator — FastAPI backend (Pulse Scout + Post Generator crew) + Streamlit UI client"
+authors = [{ name = "Shekhar Dudi" }]
 requires-python = ">=3.11,<3.14"
 dependencies = [
+    # Engine + tools (existing)
     "crewai[tools]==1.9.3",
-    "streamlit>=1.32.0",
     "arxiv>=2.1.0",
     "tavily-python>=0.3.3",
     "anthropic>=0.25.0",
@@ -18,21 +18,41 @@ dependencies = [
     "Pillow>=10.0.0",
     "python-dotenv>=1.0.0",
     "crawl4ai>=0.4.0",
+    # API layer (new)
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic-settings>=2.5.0",
+    "structlog>=24.4.0",
+    "slowapi>=0.1.9",
+    # UI (still importable from the same env for `make dev`)
+    "streamlit>=1.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
 ]
 
 [project.scripts]
-linkedin_post_generator = "linkedin_post_generator.main:run"
-run_crew = "linkedin_post_generator.main:run"
-run_scout = "linkedin_post_generator.main:run_scout"
-run_app = "linkedin_post_generator.main:run_app"
-train = "linkedin_post_generator.main:train"
-replay = "linkedin_post_generator.main:replay"
-test = "linkedin_post_generator.main:test"
-run_with_trigger = "linkedin_post_generator.main:run_with_trigger"
+run_api = "backend.main:run_api"
+run_app = "backend.main:run_app"
+run_scout = "backend.main:run_scout"
+run_crew = "backend.main:run"
+linkedin_post_generator = "backend.main:run"
+train = "backend.main:train"
+replay = "backend.main:replay"
+test = "backend.main:test"
+run_with_trigger = "backend.main:run_with_trigger"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["backend"]
 
 [tool.crewai]
 type = "crew"
@@ -40,3 +60,16 @@ type = "crew"
 [tool.uv]
 # onnxruntime 1.20+ dropped Intel Mac (x86_64) wheels — pin to last supported version
 override-dependencies = ["onnxruntime>=1.16.0,<=1.19.2"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::SyntaxWarning"]
